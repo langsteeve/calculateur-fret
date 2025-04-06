@@ -1,4 +1,6 @@
 import { useState } from "react";
+import jsPDF from "jspdf";
+
 
 const ebmTarifs = [
   { secteurs: ["Faaa", "Papeete", "Pirae"], tarifs: [2500, 4500, 7000] },
@@ -77,13 +79,12 @@ export default function App() {
     let fret = 0;
     const ile = destination.toUpperCase();
     const vol = parseFloat(volume);
-
+  
     if (!ile || isNaN(vol)) {
       setResultat("Destination ou volume invalide");
       return;
     }
-
-    // Livraison
+  
     if (typeLivraison === "local") {
       const zone = ebmTarifs.find(z => z.secteurs.map(s => s.toUpperCase()).includes(ile));
       if (!zone) {
@@ -94,8 +95,7 @@ export default function App() {
     } else {
       livraison = vol < 0.25 ? 2500 : vol <= 1 ? 4500 : 7000;
     }
-
-    // Fret
+  
     if (typeLivraison === "fret") {
       const data = fretData[ile];
       if (!data) {
@@ -106,9 +106,48 @@ export default function App() {
       const tarifKg = data[typeFret];
       fret = poidsCalc * tarifKg + data.LTA;
     }
-
+  
     setResultat({ livraison, fret, total: livraison + fret });
   };
+  
+  // ⬇️ FONCTION BIEN EN DEHORS DE calculer
+  const formatNombre = (n) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+
+const exporterPDF = () => {
+  if (!resultat || typeof resultat !== 'object') return;
+
+  const doc = new jsPDF();
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(14);
+  doc.setTextColor(33, 33, 33); // gris foncé
+
+  doc.setFillColor(245, 245, 245);
+  doc.rect(10, 10, 190, 90, 'F'); // fond clair
+
+  doc.setFontSize(16);
+  doc.text("RÉSUMÉ DU CALCUL", 105, 20, { align: "center" });
+
+  const yStart = 40;
+  let y = yStart;
+  const lignes = [
+    typeLivraison === 'fret'
+      ? `Fret vers ${destination} (${fretLabel(typeFret)})`
+      : `Livraison locale à ${destination}`,
+    `Poids     : ${poids} kg`,
+    `Volume    : ${volume} m³`,
+    `Fret      : ${formatNombre(resultat.fret)} F`,
+    `Livraison : ${formatNombre(resultat.livraison)} F`,
+    `TOTAL     : ${formatNombre(resultat.total)} F`
+  ];
+
+  doc.setFontSize(13);
+  lignes.forEach(ligne => {
+    doc.text(ligne, 20, y);
+    y += 10;
+  });
+
+  doc.save("calcul-fret-livraison.pdf");
+};
 
   return (
     <div style={{ backgroundColor: '#111827', color: 'white', minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '2rem' }}>
@@ -158,13 +197,24 @@ export default function App() {
           </div>
           {typeof resultat === 'string' && <p style={{ color: 'red' }}>{resultat}</p>}
           {resultat && typeof resultat === 'object' && (
-            <div style={{ backgroundColor: '#374151', padding: '1rem', borderRadius: '0.75rem', marginTop: '1rem' }}>
-              <p><strong>Résumé :</strong> {typeLivraison === 'fret' ? `Livraison au fret Air Tahiti vers ${destination} en ${fretLabel(typeFret)} - Poids : ${poids} kg - Volume : ${volume} m³` : `Livraison sur Tahiti à ${destination} - Volume : ${volume} m³`}</p>
-              <p><strong>Fret :</strong> {resultat.fret.toLocaleString()} F</p>
-              <p><strong>Livraison :</strong> {resultat.livraison.toLocaleString()} F</p>
-              <p style={{ fontSize: '1.4rem', fontWeight: 'bold' }}><strong>TOTAL :</strong> {resultat.total.toLocaleString()} F</p>
-            </div>
-          )}
+  <div style={{ backgroundColor: '#374151', padding: '1rem', borderRadius: '0.75rem', marginTop: '1rem' }}>
+    <img
+  src="/logo.png"
+  alt="Logo Magic City"
+  style={{ maxWidth: '200px', display: 'block', margin: '0 auto 1.5rem auto' }}
+/>
+
+    <p><strong>Résumé :</strong> {typeLivraison === 'fret'
+      ? `Livraison au fret Air Tahiti vers ${destination} en ${fretLabel(typeFret)} - Poids : ${poids} kg - Volume : ${volume} m³`
+      : `Livraison sur Tahiti à ${destination} - Volume : ${volume} m³`}</p>
+    <p><strong>Fret :</strong> {resultat.fret.toLocaleString()} F</p>
+    <p><strong>Livraison :</strong> {resultat.livraison.toLocaleString()} F</p>
+    <p style={{ fontSize: '1.4rem', fontWeight: 'bold' }}><strong>TOTAL :</strong> {resultat.total.toLocaleString()} F</p>
+
+    <button onClick={exporterPDF} style={buttonPdf}>Exporter en PDF</button>
+  </div>
+)}
+
         </div>
       </div>
     </div>
